@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "../utils/axiosConfig";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
+import { PDFDocument, StandardFonts } from "pdf-lib";
+import * as XLSX from "xlsx";
 
 export default function ItemLedger() {
   const [items, setItems] = useState([]);
@@ -10,6 +10,8 @@ export default function ItemLedger() {
   const [loading, setLoading] = useState(false);
   const [loadingItems, setLoadingItems] = useState(true);
   const [error, setError] = useState(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   // Check if an item was selected from Stock Ledger
   useEffect(() => {
@@ -95,90 +97,145 @@ export default function ItemLedger() {
     fetchItemLedger();
   }, [selectedItemId]);
 
-  // Sort ledger data by date (latest first)
-  const sortedLedger = ledgerData?.ledger ? [...ledgerData.ledger].sort((a, b) => {
+  // Filter and sort ledger data by date range, latest first
+  const filteredLedger = ledgerData?.ledger
+    ? ledgerData.ledger.filter((entry) => {
+        if (!entry.date) return !startDate && !endDate;
+        const entryTime = new Date(entry.date).getTime();
+        if (startDate && entryTime < new Date(startDate).getTime()) return false;
+        if (endDate && entryTime > new Date(endDate).getTime()) return false;
+        return true;
+      })
+    : [];
+
+  const sortedLedger = filteredLedger.sort((a, b) => {
     const dateA = a.date ? new Date(a.date).getTime() : 0;
     const dateB = b.date ? new Date(b.date).getTime() : 0;
     return dateB - dateA; // Latest first
-  }) : [];
+  });
 
-  // Export to CSV
-  const exportToCSV = () => {
+  // Export to Excel
+  const exportToExcel = () => {
     if (!sortedLedger || sortedLedger.length === 0) {
       alert("No data to export");
       return;
     }
 
-    const headers = ["Date", "Type", "Details", "Quantity", "Issued By"];
-    const rows = sortedLedger.map(entry => [
-      entry.date ? new Date(entry.date).toLocaleDateString() : '-',
-      entry.type || '-',
-      entry.details || '-',
-      entry.quantity || '-',
-      entry.issuedBy || entry.receivedBy || '-'
-    ]);
+    const worksheetData = sortedLedger.map((entry) => ({
+      Date: entry.date ? new Date(entry.date).toLocaleDateString() : "-",
+      Type: entry.type || "-",
+      Details: entry.details || "-",
+      Quantity: entry.quantity || "-",
+      "Issued By": entry.issuedBy || entry.receivedBy || "-",
+    }));
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-    ].join("\n");
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Item Ledger");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const workbookBlob = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+
+    const blob = new Blob([workbookBlob], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `item_ledger_${ledgerData?.item_details?.item_name || 'export'}_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = "hidden";
+    link.href = url;
+    link.download = `item_ledger_${ledgerData?.item_details?.item_name || "export"}_${new Date()
+      .toISOString()
+      .split("T")[0]}.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Export to PDF
-  const exportToPDF = () => {
+  // Export to PDF using pdf-lib
+  const exportToPDF = async () => {
     if (!sortedLedger || sortedLedger.length === 0) {
       alert("No data to export");
       return;
     }
 
-    const doc = new jsPDF();
-    
-    // Title
-    doc.setFontSize(16);
-    doc.text("Item Ledger Report", 14, 15);
-    
-    // Item Details
-    doc.setFontSize(12);
-    doc.text(`Item: ${ledgerData?.item_details?.item_name || '-'}`, 14, 25);
-    doc.text(`Size: ${ledgerData?.item_details?.size || '-'}`, 14, 30);
-    doc.text(`Color: ${ledgerData?.item_details?.color || '-'}`, 14, 35);
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage();
+    const { width, height } = page.getSize();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    // Table data
-    const tableData = sortedLedger.map(entry => [
-      entry.date ? new Date(entry.date).toLocaleDateString() : '-',
-      entry.type || '-',
-      entry.details || '-',
-      entry.quantity || '-',
-      entry.issuedBy || entry.receivedBy || '-'
-    ]);
+    let y = height - 40;
+    const lineHeight = 14;
 
-    doc.autoTable({
-      startY: 40,
-      head: [["Date", "Type", "Details", "Quantity", "Issued By"]],
-      body: tableData,
-      theme: "striped",
-      headStyles: { fillColor: [249, 250, 251] },
-      styles: { fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 60 },
-        3: { cellWidth: 25 },
-        4: { cellWidth: 40 }
+    const drawTextLine = (text, x, yPos, size = 12) => {
+      page.drawText(text, { x, y: yPos, size, font });
+    };
+
+    // Title and item details
+    drawTextLine("Item Ledger Report", 40, y, 16);
+    y -= lineHeight * 2;
+
+    drawTextLine(
+      `Item: ${ledgerData?.item_details?.item_name || "-"}`,
+      40,
+      y
+    );
+    y -= lineHeight;
+    drawTextLine(
+      `Size: ${ledgerData?.item_details?.size || "-"}`,
+      40,
+      y
+    );
+    y -= lineHeight;
+    drawTextLine(
+      `Color: ${ledgerData?.item_details?.color || "-"}`,
+      40,
+      y
+    );
+    y -= lineHeight * 2;
+
+    // Table header
+    drawTextLine("Date", 40, y);
+    drawTextLine("Type", 120, y);
+    drawTextLine("Details", 180, y);
+    drawTextLine("Qty", 360, y);
+    drawTextLine("Issued By", 420, y);
+    y -= lineHeight;
+
+    // Rows
+    sortedLedger.forEach((entry) => {
+      if (y < 40) {
+        // new page
+        const newPage = pdfDoc.addPage();
+        y = newPage.getSize().height - 40;
       }
+
+      const dateText = entry.date
+        ? new Date(entry.date).toLocaleDateString()
+        : "-";
+      drawTextLine(dateText, 40, y);
+      drawTextLine(entry.type || "-", 120, y);
+      drawTextLine((entry.details || "-").toString().slice(0, 40), 180, y);
+      drawTextLine(entry.quantity || "-", 360, y);
+      drawTextLine(
+        entry.issuedBy || entry.receivedBy || "-",
+        420,
+        y
+      );
+      y -= lineHeight;
     });
 
-    doc.save(`item_ledger_${ledgerData?.item_details?.item_name || 'export'}_${new Date().toISOString().split('T')[0]}.pdf`);
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: "application/pdf" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = `item_ledger_${ledgerData?.item_details?.item_name || "export"}_${new Date()
+      .toISOString()
+      .split("T")[0]}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -258,15 +315,41 @@ export default function ItemLedger() {
 
           {/* Ledger Table */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <h2 className="text-lg font-semibold text-gray-800">Transaction Ledger</h2>
+            <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <h2 className="text-lg font-semibold text-gray-800">Transaction Ledger</h2>
+                <div className="flex flex-wrap gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="px-2 py-1 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="px-2 py-1 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
               <div className="flex gap-2">
                 <button
-                  onClick={exportToCSV}
+                  onClick={exportToExcel}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium transition-colors"
                   disabled={!sortedLedger || sortedLedger.length === 0}
                 >
-                  Download CSV
+                  Download Excel
                 </button>
                 <button
                   onClick={exportToPDF}

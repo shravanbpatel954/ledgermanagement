@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from "react";
 import api from "../utils/axiosConfig";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
+import { PDFDocument, StandardFonts } from "pdf-lib";
+import * as XLSX from "xlsx";
 
 export default function BillLedger() {
   const [billData, setBillData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     const fetchBillSummary = async () => {
@@ -38,7 +40,7 @@ export default function BillLedger() {
     fetchBillSummary();
   }, []);
 
-  const filteredBills = billData.filter((bill) => {
+  const filteredBillsByStatus = billData.filter((bill) => {
     if (statusFilter === "all") return true;
     const normalizedStatus = (bill.status || "").toLowerCase();
     if (statusFilter === "approved") {
@@ -50,6 +52,15 @@ export default function BillLedger() {
     return true;
   });
 
+  // Apply start/end date filter
+  const filteredBills = filteredBillsByStatus.filter((bill) => {
+    if (!bill.bill_date) return !startDate && !endDate;
+    const billTime = new Date(bill.bill_date).getTime();
+    if (startDate && billTime < new Date(startDate).getTime()) return false;
+    if (endDate && billTime > new Date(endDate).getTime()) return false;
+    return true;
+  });
+
   // Sort bills by date (latest first)
   const sortedBills = [...filteredBills].sort((a, b) => {
     const dateA = a.bill_date ? new Date(a.bill_date).getTime() : 0;
@@ -57,77 +68,115 @@ export default function BillLedger() {
     return dateB - dateA; // Latest first
   });
 
-  // Export to CSV
-  const exportToCSV = () => {
+  // Export to Excel
+  const exportToExcel = () => {
     if (!sortedBills || sortedBills.length === 0) {
       alert("No data to export");
       return;
     }
 
-    const headers = ["Bill No.", "Vendor", "Bill Date", "Amount", "Status"];
-    const rows = sortedBills.map(bill => [
-      bill.bill_no || '-',
-      bill.Vendor?.vendor_name || '-',
-      bill.bill_date ? new Date(bill.bill_date).toLocaleDateString() : '-',
-      parseFloat(bill.bill_amount || 0).toFixed(2),
-      (bill.status || "Pending").toLowerCase() === "completed" ? "Approved" : (bill.status || "Pending")
-    ]);
+    const worksheetData = sortedBills.map((bill) => ({
+      "Bill No.": bill.bill_no || "-",
+      Vendor: bill.Vendor?.vendor_name || "-",
+      "Bill Date": bill.bill_date
+        ? new Date(bill.bill_date).toLocaleDateString()
+        : "-",
+      Amount: parseFloat(bill.bill_amount || 0).toFixed(2),
+      Status:
+        (bill.status || "Pending").toLowerCase() === "completed"
+          ? "Approved"
+          : bill.status || "Pending",
+    }));
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-    ].join("\n");
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Bill Ledger");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const workbookBlob = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+
+    const blob = new Blob([workbookBlob], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `bill_ledger_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = "hidden";
+    link.href = url;
+    link.download = `bill_ledger_${new Date().toISOString().split("T")[0]}.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Export to PDF
-  const exportToPDF = () => {
+  // Export to PDF using pdf-lib
+  const exportToPDF = async () => {
     if (!sortedBills || sortedBills.length === 0) {
       alert("No data to export");
       return;
     }
 
-    const doc = new jsPDF();
-    
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage();
+    const { width, height } = page.getSize();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    let y = height - 40;
+    const lineHeight = 14;
+
+    const drawTextLine = (text, x, yPos, size = 12) => {
+      page.drawText(text, { x, y: yPos, size, font });
+    };
+
     // Title
-    doc.setFontSize(16);
-    doc.text("Bill Summary Report", 14, 15);
+    drawTextLine("Bill Summary Report", 40, y, 16);
+    y -= lineHeight * 2;
 
-    // Table data
-    const tableData = sortedBills.map(bill => [
-      bill.bill_no || '-',
-      bill.Vendor?.vendor_name || '-',
-      bill.bill_date ? new Date(bill.bill_date).toLocaleDateString() : '-',
-      `₹${parseFloat(bill.bill_amount || 0).toFixed(2)}`,
-      (bill.status || "Pending").toLowerCase() === "completed" ? "Approved" : (bill.status || "Pending")
-    ]);
+    // Table header
+    drawTextLine("Bill No.", 40, y);
+    drawTextLine("Vendor", 120, y);
+    drawTextLine("Bill Date", 260, y);
+    drawTextLine("Amount", 360, y);
+    drawTextLine("Status", 440, y);
+    y -= lineHeight;
 
-    doc.autoTable({
-      startY: 25,
-      head: [["Bill No.", "Vendor", "Bill Date", "Amount", "Status"]],
-      body: tableData,
-      theme: "striped",
-      headStyles: { fillColor: [249, 250, 251] },
-      styles: { fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 35 },
-        1: { cellWidth: 50 },
-        2: { cellWidth: 35 },
-        3: { cellWidth: 35 },
-        4: { cellWidth: 35 }
+    // Rows
+    sortedBills.forEach((bill) => {
+      if (y < 40) {
+        const newPage = pdfDoc.addPage();
+        y = newPage.getSize().height - 40;
       }
+
+      const dateText = bill.bill_date
+        ? new Date(bill.bill_date).toLocaleDateString()
+        : "-";
+      drawTextLine(bill.bill_no || "-", 40, y);
+      drawTextLine(bill.Vendor?.vendor_name || "-", 120, y);
+      drawTextLine(dateText, 260, y);
+      drawTextLine(
+        `Rs ${parseFloat(bill.bill_amount || 0).toFixed(2)}`,
+        360,
+        y
+      );
+      drawTextLine(
+        (bill.status || "Pending").toLowerCase() === "completed"
+          ? "Approved"
+          : bill.status || "Pending",
+        440,
+        y
+      );
+      y -= lineHeight;
     });
 
-    doc.save(`bill_ledger_${new Date().toISOString().split('T')[0]}.pdf`);
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: "application/pdf" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = `bill_ledger_${new Date().toISOString().split("T")[0]}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -163,23 +212,47 @@ export default function BillLedger() {
                   Filter by pending or approved bills to review totals.
                 </p>
               </div>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer w-full md:w-auto"
-              >
-                <option value="all">All Bills</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-              </select>
+              <div className="flex flex-wrap gap-3 items-end">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="px-2 py-1 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="px-2 py-1 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer w-full md:w-auto"
+                >
+                  <option value="all">All Bills</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                </select>
+              </div>
             </div>
             <div className="flex gap-2">
               <button
-                onClick={exportToCSV}
+                onClick={exportToExcel}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium transition-colors"
                 disabled={!sortedBills || sortedBills.length === 0}
               >
-                Download CSV
+                Download Excel
               </button>
               <button
                 onClick={exportToPDF}
