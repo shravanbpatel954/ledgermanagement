@@ -1,0 +1,34 @@
+<<<<<<< HEAD
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=edims_db
+JWT_SECRET=gmjdfbhj@jfhnjg
+PORT=5000
+CLIENT_URL=http://localhost:3000
+SMTP_PASS=vrpxmtoxmwvweldv
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=shravan.b.patel954@gmail.com
+SMTP_FROM="EDIMS <shravan.b.patel954@gmail.com>"
+=======
+# Copy this file to .env in the edims-backend directory
+# Rename this file from env-template.txt to .env
+
+# Database Configuration
+DB_HOST=localhost
+DB_NAME=edims_db
+DB_USER=root
+DB_PASSWORD=
+
+# Server Configuration
+PORT=5000
+
+# Client URL (for CORS)
+CLIENT_URL=http://localhost:3000
+
+# JWT Secret (for authentication)
+JWT_SECRET=your-secret-key-change-this-in-production
+
+>>>>>>> 1107e91 (reports addeed & sidebar navbar static)

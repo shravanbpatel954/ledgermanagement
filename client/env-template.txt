@@ -1,0 +1,5 @@
+# Copy this file to .env in the client directory
+# Rename this file from env-template.txt to .env
+
+REACT_APP_API_URL=http://localhost:5000
+
