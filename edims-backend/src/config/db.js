@@ -1,16 +1,21 @@
 // src/config/db.js
-import { Sequelize } from 'sequelize';
-// Note: dotenv.config() is called in server.js to ensure proper path resolution
-// Validation happens when connection is attempted (in app.js connectToDatabase function)
+import { Sequelize } from "sequelize";
 
 const sequelize = new Sequelize(
-  process.env.DB_NAME || 'edims_db',
-  process.env.DB_USER || 'root',
-  process.env.DB_PASSWORD || '',
+  process.env.DB_NAME,
+  process.env.DB_USER,
+  process.env.DB_PASSWORD,
   {
-    host: process.env.DB_HOST || 'localhost',
-    dialect: 'mysql',
-    logging: false, // Set to console.log to see SQL queries
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    dialect: "mysql",
+    logging: false,
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    }
   }
 );
 
