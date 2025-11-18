@@ -23,8 +23,9 @@ export default function ForgotPassword() {
     }
 
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      
+    
+      const apiUrl = process.env.REACT_APP_API_URL;
+
       const res = await axios.post(
         `${apiUrl}/api/auth/forgot-password`,
         {
