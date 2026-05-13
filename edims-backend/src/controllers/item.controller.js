@@ -1,4 +1,5 @@
 import { Item } from '../models/index.js';
+import { actorUserId, recordAudit } from '../utils/auditLog.util.js';
 
 // --- 1. Create a new Item (Admin Only) ---
 export const createItem = async (req, res) => {
@@ -21,6 +22,18 @@ export const createItem = async (req, res) => {
     });
     
     console.log('Item created successfully:', newItem.item_id);
+
+    await recordAudit({
+      userId: actorUserId(req),
+      action_type: 'CREATE',
+      module: 'Item',
+      record_id: newItem.item_id,
+      details: {
+        item_name: newItem.item_name,
+        size: newItem.size,
+        color: newItem.color,
+      },
+    });
     
     // Return with item_id mapped as item_number for frontend compatibility
     res.status(201).json({
@@ -104,6 +117,19 @@ export const updateItem = async (req, res) => {
     item.color = color || item.color;
 
     await item.save();
+
+    await recordAudit({
+      userId: actorUserId(req),
+      action_type: 'UPDATE',
+      module: 'Item',
+      record_id: item.item_id,
+      details: {
+        item_name: item.item_name,
+        size: item.size,
+        color: item.color,
+      },
+    });
+
     res.status(200).json(item);
   } catch (error) {
     if (error.name === 'SequelizeUniqueConstraintError') {
@@ -130,6 +156,18 @@ export const deleteItem = async (req, res) => {
       return res.status(400)
         .json({ message: 'Cannot delete item with stock > 0' });
     }
+
+    await recordAudit({
+      userId: actorUserId(req),
+      action_type: 'DELETE',
+      module: 'Item',
+      record_id: item.item_id,
+      details: {
+        item_name: item.item_name,
+        size: item.size,
+        color: item.color,
+      },
+    });
 
     await item.destroy();
     res.status(200).json({ message: 'Item deleted successfully' });

@@ -23,6 +23,10 @@ AuditLog.init(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
     details: {
       type: DataTypes.JSON,
       allowNull: true,

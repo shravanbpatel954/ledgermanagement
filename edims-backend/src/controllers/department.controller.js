@@ -1,4 +1,5 @@
 import { Department } from '../models/index.js';
+import { actorUserId, recordAudit } from '../utils/auditLog.util.js';
 
 // --- 1. Create a new Department (Admin Only) ---
 export const createDepartment = async (req, res) => {
@@ -12,6 +13,14 @@ export const createDepartment = async (req, res) => {
   try {
     const newDepartment = await Department.create({ dept_name });
     
+    await recordAudit({
+      userId: actorUserId(req),
+      action_type: 'CREATE',
+      module: 'Department',
+      record_id: newDepartment.dept_id,
+      details: { dept_name: newDepartment.dept_name },
+    });
+
     // Return with dept_id (auto-generated)
     res.status(201).json({
       dept_id: newDepartment.dept_id,
@@ -70,6 +79,15 @@ export const updateDepartment = async (req, res) => {
 
     department.dept_name = dept_name || department.dept_name;
     await department.save();
+
+    await recordAudit({
+      userId: actorUserId(req),
+      action_type: 'UPDATE',
+      module: 'Department',
+      record_id: department.dept_id,
+      details: { dept_name: department.dept_name },
+    });
+
     res.status(200).json(department);
   } catch (error) {
     if (error.name === 'SequelizeUniqueConstraintError') {
@@ -91,6 +109,14 @@ export const deleteDepartment = async (req, res) => {
     
     // TODO: Add check - don't delete if linked to a StockIssue
     // We'll add this later.
+    
+    await recordAudit({
+      userId: actorUserId(req),
+      action_type: 'DELETE',
+      module: 'Department',
+      record_id: department.dept_id,
+      details: { dept_name: department.dept_name },
+    });
     
     await department.destroy();
     res.status(200).json({ message: 'Department deleted successfully' });

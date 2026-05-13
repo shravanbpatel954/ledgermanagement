@@ -1,8 +1,10 @@
 import axios from "axios";
 import Cookies from "js-cookie";
 
+// Must match Login.js: same env var and same local default, or login works while
+// authenticated api.* calls hit the wrong host and show "Network Error".
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "https://mu-backend-tnvo.onrender.com",
+  baseURL: process.env.REACT_APP_API_URL || "http://localhost:5000",
   withCredentials: true,
 });
 

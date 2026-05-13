@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from "react";
 import api from "../utils/axiosConfig";
+import {
+  todayLocalDateInputValue,
+  clampDateInputToMin,
+} from "../utils/dateInputHelpers";
 import { CheckCircle2, Clock, Plus, X } from "lucide-react";
 
 export default function BillEntry() {
@@ -127,7 +131,12 @@ export default function BillEntry() {
   // Open modal
   const openAddModal = () => {
     const nextBillNo = getNextBillNo();
-    setBill({ bill_no: nextBillNo, vendor_id: "", bill_for: "challan", bill_date: "" });
+    setBill({
+      bill_no: nextBillNo,
+      vendor_id: "",
+      bill_for: "challan",
+      bill_date: todayLocalDateInputValue(),
+    });
     setSelectedChallans([]);
     setBillItems([]);
     setIsModalOpen(true);
@@ -154,6 +163,10 @@ export default function BillEntry() {
     e.preventDefault();
     if (!bill.bill_no || !bill.vendor_id || !bill.bill_for || !bill.bill_date) {
       return alert("Please fill all required fields.");
+    }
+    const today = todayLocalDateInputValue();
+    if (bill.bill_date < today) {
+      return alert("Bill date cannot be in the past.");
     }
     if (selectedChallans.length === 0) {
       return alert("Please select at least one challan.");
@@ -182,7 +195,12 @@ export default function BillEntry() {
       await fetchBills();
       
       // Reset form
-      setBill({ bill_no: "", vendor_id: "", bill_for: "challan", bill_date: "" });
+      setBill({
+        bill_no: "",
+        vendor_id: "",
+        bill_for: "challan",
+        bill_date: todayLocalDateInputValue(),
+      });
       setSelectedChallans([]);
       setBillItems([]);
     } catch (err) {
@@ -413,7 +431,13 @@ export default function BillEntry() {
                   <input
                     type="date"
                     value={bill.bill_date}
-                    onChange={(e) => setBill({ ...bill, bill_date: e.target.value })}
+                    min={todayLocalDateInputValue()}
+                    onChange={(e) =>
+                      setBill({
+                        ...bill,
+                        bill_date: clampDateInputToMin(e.target.value),
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />

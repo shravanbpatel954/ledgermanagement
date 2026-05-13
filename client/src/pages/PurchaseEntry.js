@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from "react";
 import api from "../utils/axiosConfig";
+import {
+  todayLocalDateInputValue,
+  clampDateInputToMin,
+} from "../utils/dateInputHelpers";
 import { Plus, X } from "lucide-react";
 
 export default function PurchaseEntry() {
@@ -98,7 +102,12 @@ export default function PurchaseEntry() {
   // Modal Open -> Set default purchase number (previous + 1)
   const openAddModal = () => {
     const nextPurchaseNo = getNextPurchaseNo();
-    setPurchase({ purchase_no: nextPurchaseNo, vendor_id: "", order_date: "", remarks: "" });
+    setPurchase({
+      purchase_no: nextPurchaseNo,
+      vendor_id: "",
+      order_date: todayLocalDateInputValue(),
+      remarks: "",
+    });
     setPoItems([{ item_id: "", quantity_ordered: "" }]);
     setIsModalOpen(true);
   };
@@ -117,6 +126,10 @@ export default function PurchaseEntry() {
     e.preventDefault();
     if (!purchase.purchase_no || !purchase.vendor_id || !purchase.order_date) {
       return alert("Please fill required fields.");
+    }
+    const today = todayLocalDateInputValue();
+    if (purchase.order_date < today) {
+      return alert("Order date cannot be in the past.");
     }
     if (poItems.length === 0 || poItems.some(i => !i.item_id || !i.quantity_ordered)) {
       return alert("Please add at least one valid item with quantity.");
@@ -142,7 +155,12 @@ export default function PurchaseEntry() {
       );
       setPurchaseOrders(sortedPOs);
       // Reset form
-      setPurchase({ purchase_no: "", vendor_id: "", order_date: "", remarks: "" });
+      setPurchase({
+        purchase_no: "",
+        vendor_id: "",
+        order_date: todayLocalDateInputValue(),
+        remarks: "",
+      });
       setPoItems([{ item_id: "", quantity_ordered: "" }]);
     } catch (err) {
       console.error("Error creating purchase order:", err);
@@ -266,7 +284,13 @@ export default function PurchaseEntry() {
                   <input
                     type="date"
                     value={purchase.order_date}
-                    onChange={(e) => setPurchase({ ...purchase, order_date: e.target.value })}
+                    min={todayLocalDateInputValue()}
+                    onChange={(e) =>
+                      setPurchase({
+                        ...purchase,
+                        order_date: clampDateInputToMin(e.target.value),
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />

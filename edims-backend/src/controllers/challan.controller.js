@@ -11,6 +11,7 @@ import {
 } from '../models/index.js';
 
 import { Op } from 'sequelize';
+import { recordAudit } from '../utils/auditLog.util.js';
 
 
 // ---------------------------
@@ -89,6 +90,19 @@ export const createChallan = async (req, res) => {
     }
 
     await t.commit();
+
+    await recordAudit({
+      userId: user_id,
+      action_type: 'CREATE',
+      module: 'Challan',
+      record_id: challan_id,
+      details: {
+        challan_no,
+        po_id: parseInt(po_id, 10),
+        delivery_date,
+        line_count: items.length,
+      },
+    });
 
     res.status(201).json({
       message: 'Challan created and stock updated successfully',

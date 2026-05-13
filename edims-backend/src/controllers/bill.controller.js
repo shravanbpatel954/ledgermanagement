@@ -5,12 +5,12 @@ import {
   BillItem,
   Vendor,
   User,
-  AuditLog,
   Challan,
   ChallanItem, // <-- Now needed
   Item,
 } from '../models/index.js';
 import { Op } from 'sequelize'; // <-- Now needed
+import { recordAudit } from '../utils/auditLog.util.js';
 
 // --- 1. Create a new Bill (SECURE REFACTOR) ---
 export const createBill = async (req, res) => {
@@ -107,6 +107,20 @@ export const createBill = async (req, res) => {
     // --- Step 6: Commit ---
     await t.commit();
 
+    await recordAudit({
+      userId: user_id,
+      action_type: 'CREATE',
+      module: 'Bill',
+      record_id: newBill.bill_id,
+      details: {
+        bill_no,
+        vendor_id: parseInt(vendor_id, 10),
+        bill_date,
+        challan_ids,
+        bill_amount: newBill.bill_amount,
+      },
+    });
+
     // --- Step 7: Fetch and return the full bill ---
     const fullNewBill = await getFullBillById(newBill.bill_id);
     res.status(201).json(fullNewBill);
@@ -179,13 +193,15 @@ export const completeBill = async (req, res) => {
     bill.status = 'Completed';
     await bill.save();
 
-    // Create audit log
-    await AuditLog.create({
-      user_id: user_id,
+    await recordAudit({
+      userId: user_id,
       action_type: 'UPDATE',
       module: 'Bill',
       record_id: bill.bill_id,
-      details: `Bill #${bill.bill_no} marked as 'Completed' by user_id ${user_id}.`,
+      details: {
+        summary: `Bill #${bill.bill_no} marked as Completed.`,
+        bill_no: bill.bill_no,
+      },
     });
 
     res.status(200).json({
@@ -229,16 +245,17 @@ export const deleteBill = async (req, res) => {
         transaction: t,
       });
 
-      await AuditLog.create(
-        {
-          user_id: user_id,
-          action_type: 'DELETE',
-          module: 'Bill',
-          record_id: id,
-          details: `Bill #${bill.bill_no} (Pending) was deleted by user_id ${user_id}.`,
+      await recordAudit({
+        userId: user_id,
+        action_type: 'DELETE',
+        module: 'Bill',
+        record_id: id,
+        details: {
+          summary: `Pending bill #${bill.bill_no} deleted.`,
+          bill_no: bill.bill_no,
         },
-        { transaction: t }
-      );
+        transaction: t,
+      });
 
       await bill.destroy({ transaction: t });
 

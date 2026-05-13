@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from "react";
 import api from "../utils/axiosConfig";
+import {
+  todayLocalDateInputValue,
+  clampDateInputToMin,
+} from "../utils/dateInputHelpers";
 import { Plus, X } from "lucide-react";
 
 export default function ChallanEntry() {
@@ -126,7 +130,11 @@ export default function ChallanEntry() {
   // Open modal
   const openAddModal = () => {
     const nextChallanNo = getNextChallanNo();
-    setChallan({ challan_no: nextChallanNo, po_id: "", delivery_date: "" });
+    setChallan({
+      challan_no: nextChallanNo,
+      po_id: "",
+      delivery_date: todayLocalDateInputValue(),
+    });
     setSelectedPO(null);
     setPoItems([]);
     setChallanItems([{ item_id: "", quantity_received: "" }]);
@@ -164,6 +172,10 @@ export default function ChallanEntry() {
     e.preventDefault();
     if (!challan.challan_no || !challan.po_id || !challan.delivery_date) {
       return alert("Please fill all required fields.");
+    }
+    const today = todayLocalDateInputValue();
+    if (challan.delivery_date < today) {
+      return alert("Delivery date cannot be in the past.");
     }
     if (challanItems.length === 0 || challanItems.some(i => !i.item_id || !i.quantity_received)) {
       return alert("Please add at least one valid item with quantity received.");
@@ -203,7 +215,11 @@ export default function ChallanEntry() {
       setChallans(challansRes.data || []);
       
       // Reset form
-      setChallan({ challan_no: "", po_id: "", delivery_date: "" });
+      setChallan({
+        challan_no: "",
+        po_id: "",
+        delivery_date: todayLocalDateInputValue(),
+      });
       setSelectedPO(null);
       setPoItems([]);
       setChallanItems([{ item_id: "", quantity_received: "" }]);
@@ -321,7 +337,13 @@ export default function ChallanEntry() {
                   <input
                     type="date"
                     value={challan.delivery_date}
-                    onChange={(e) => setChallan({ ...challan, delivery_date: e.target.value })}
+                    min={todayLocalDateInputValue()}
+                    onChange={(e) =>
+                      setChallan({
+                        ...challan,
+                        delivery_date: clampDateInputToMin(e.target.value),
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />

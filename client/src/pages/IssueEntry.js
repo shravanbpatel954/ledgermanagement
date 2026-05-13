@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from "react";
 import api from "../utils/axiosConfig";
+import {
+  todayLocalDateInputValue,
+  clampDateInputToMin,
+} from "../utils/dateInputHelpers";
 import { Plus, X } from "lucide-react";
 
 export default function IssueEntry() {
@@ -74,7 +78,7 @@ export default function IssueEntry() {
       quantity_issued: "",
       dept_id: "",
       purpose: "",
-      issue_date: new Date().toISOString().split('T')[0],
+      issue_date: todayLocalDateInputValue(),
     });
     setIsModalOpen(true);
   };
@@ -90,6 +94,10 @@ export default function IssueEntry() {
     e.preventDefault();
     if (!issue.item_id || !issue.quantity_issued || !issue.dept_id || !issue.purpose || !issue.issue_date) {
       return alert("Please fill all required fields.");
+    }
+    const today = todayLocalDateInputValue();
+    if (issue.issue_date < today) {
+      return alert("Issue date cannot be in the past.");
     }
 
     const qty = parseInt(issue.quantity_issued);
@@ -129,7 +137,7 @@ export default function IssueEntry() {
         quantity_issued: "",
         dept_id: "",
         purpose: "",
-        issue_date: new Date().toISOString().split('T')[0],
+        issue_date: todayLocalDateInputValue(),
       });
     } catch (err) {
       console.error("Error creating stock issue:", err);
@@ -349,7 +357,13 @@ export default function IssueEntry() {
                 <input
                   type="date"
                   value={issue.issue_date}
-                  onChange={(e) => setIssue({ ...issue, issue_date: e.target.value })}
+                  min={todayLocalDateInputValue()}
+                  onChange={(e) =>
+                    setIssue({
+                      ...issue,
+                      issue_date: clampDateInputToMin(e.target.value),
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />

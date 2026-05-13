@@ -1,4 +1,5 @@
 import { sequelize, Item, StockIssue, Department, User } from '../models/index.js';
+import { recordAudit } from '../utils/auditLog.util.js';
 
 // --- 1. Create a new Stock Issue (Admin & Staff) ---
 export const createStockIssue = async (req, res) => {
@@ -52,6 +53,20 @@ export const createStockIssue = async (req, res) => {
 
     // --- Step 5: Commit the transaction ---
     await t.commit();
+
+    await recordAudit({
+      userId: user_id,
+      action_type: 'CREATE',
+      module: 'StockIssue',
+      record_id: newStockIssue.issue_id,
+      details: {
+        item_id: parseInt(item_id, 10),
+        quantity_issued: parseInt(quantity_issued, 10),
+        dept_id: parseInt(dept_id, 10),
+        purpose,
+        issue_date,
+      },
+    });
 
     res.status(201).json({
       message: 'Stock issued successfully and inventory updated',

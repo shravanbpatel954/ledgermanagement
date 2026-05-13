@@ -1,4 +1,5 @@
 import { Vendor } from '../models/index.js'; // Import from index
+import { actorUserId, recordAudit } from '../utils/auditLog.util.js';
 
 // --- 1. Create a new Vendor (Admin Only) ---
 export const createVendor = async (req, res) => {
@@ -41,6 +42,14 @@ export const createVendor = async (req, res) => {
     });
     
     console.log('Vendor created successfully:', newVendor.vendor_id);
+
+    await recordAudit({
+      userId: actorUserId(req),
+      action_type: 'CREATE',
+      module: 'Vendor',
+      record_id: newVendor.vendor_id,
+      details: { vendor_name: newVendor.vendor_name, gst_no: newVendor.gst_no },
+    });
     
     // Return with field names mapped for frontend compatibility
     res.status(201).json({
@@ -140,6 +149,18 @@ export const updateVendor = async (req, res) => {
     vendor.address = address || vendor.address;
 
     await vendor.save();
+
+    await recordAudit({
+      userId: actorUserId(req),
+      action_type: 'UPDATE',
+      module: 'Vendor',
+      record_id: vendor.vendor_id,
+      details: {
+        vendor_name: vendor.vendor_name,
+        gst_no: vendor.gst_no,
+      },
+    });
+
     res.status(200).json(vendor);
   } catch (error) {
     if (error.name === 'SequelizeUniqueConstraintError') {
@@ -167,6 +188,17 @@ export const deleteVendor = async (req, res) => {
     // We need to add a check here - don't allow delete if vendor is linked to a PO or Bill
     // We will add this logic later.
     // For now, we will just delete.
+
+    await recordAudit({
+      userId: actorUserId(req),
+      action_type: 'DELETE',
+      module: 'Vendor',
+      record_id: vendor.vendor_id,
+      details: {
+        vendor_name: vendor.vendor_name,
+        gst_no: vendor.gst_no,
+      },
+    });
 
     await vendor.destroy();
     res.status(200).json({ message: 'Vendor deleted successfully' });

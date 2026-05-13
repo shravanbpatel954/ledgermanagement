@@ -117,7 +117,9 @@ export default function AuditLog() {
                 {filteredLogs.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
-                      No audit entries match your filters.
+                      {!search.trim() && logs.length === 0
+                        ? "No audit entries yet."
+                        : "No audit entries match your filters."}
                     </td>
                   </tr>
                 ) : (

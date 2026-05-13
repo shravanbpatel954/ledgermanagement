@@ -71,11 +71,23 @@ User.prototype.checkPassword = async function (plainPassword) {
   return await bcrypt.compare(plainPassword, this.password_hash);
 };
 
+function isBcryptHash(value) {
+  return typeof value === 'string' && /^\$2[aby]\$/.test(value);
+}
+
 /* --------------------------------------
-   🔒 Hook to auto-hash password if changed
+   🔒 Hash plain password on create / update
+   (Skip if value is already a bcrypt hash — avoids double-hash bugs)
 -------------------------------------- */
+User.beforeCreate(async (user) => {
+  if (user.password_hash && !isBcryptHash(user.password_hash)) {
+    const salt = await bcrypt.genSalt(10);
+    user.password_hash = await bcrypt.hash(user.password_hash, salt);
+  }
+});
+
 User.beforeUpdate(async (user) => {
-  if (user.changed('password_hash')) {
+  if (user.changed('password_hash') && user.password_hash && !isBcryptHash(user.password_hash)) {
     const salt = await bcrypt.genSalt(10);
     user.password_hash = await bcrypt.hash(user.password_hash, salt);
   }

@@ -3,8 +3,8 @@ import { User } from '../models/index.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { sendPasswordResetEmail } from '../utils/emailService.js';
-import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
+import { actorUserId, recordAudit } from '../utils/auditLog.util.js';
 
 // Note: dotenv.config() is called in server.js before this module is imported
 // JWT_SECRET will be read at runtime to ensure it's loaded from .env
@@ -46,6 +46,19 @@ export const register = async (req, res) => {
       full_name,
       role,
       email: email || null, // Store email if provided
+    });
+
+    const actorId = actorUserId(req) ?? newUser.user_id;
+    await recordAudit({
+      userId: actorId,
+      action_type: 'CREATE',
+      module: 'User',
+      record_id: newUser.user_id,
+      details: {
+        username: newUser.username,
+        role: newUser.role,
+        full_name: newUser.full_name,
+      },
     });
 
     // Optionally issue a token at registration so the user is logged-in immediately
@@ -206,6 +219,14 @@ export const login = async (req, res) => {
       throw tokenError;
     }
 
+    await recordAudit({
+      userId: user.user_id,
+      action_type: 'LOGIN',
+      module: 'Auth',
+      record_id: user.user_id,
+      details: { username: user.username, role: user.role },
+    });
+
     // Send response
     res.status(200).json({
       message: 'Login successful',
@@ -313,6 +334,14 @@ export const forgotPassword = async (req, res) => {
       });
     }
 
+    await recordAudit({
+      userId: user.user_id,
+      action_type: 'REQUEST',
+      module: 'Auth',
+      record_id: user.user_id,
+      details: { action: 'password_reset_email_sent' },
+    });
+
     res.status(200).json({ 
       message: 'If an account with that username or email exists, a password reset link has been sent.' 
     });
@@ -369,9 +398,8 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    user.password_hash = await bcrypt.hash(newPassword, salt);
+    // Assign plain password; User.beforeUpdate hashes it once
+    user.password_hash = newPassword;
 
     // Clear reset token
     user.reset_token = null;
@@ -379,6 +407,14 @@ export const resetPassword = async (req, res) => {
     await user.save();
 
     console.log('✅ Password reset successful for:', user.username);
+
+    await recordAudit({
+      userId: user.user_id,
+      action_type: 'UPDATE',
+      module: 'User',
+      record_id: user.user_id,
+      details: { action: 'password_reset_via_token' },
+    });
 
     res.status(200).json({ 
       message: 'Password has been reset successfully. You can now login with your new password.' 

@@ -1,15 +1,5 @@
 // src/server.js
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-// Get the directory of the current module
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Load .env file from the project root (edims-backend directory)
-dotenv.config({ path: join(__dirname, '..', '.env') });
-
+import './loadEnv.js';
 import app, { connectToDatabase } from './app.js';
 
 const PORT = process.env.PORT || 5000;

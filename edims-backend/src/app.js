@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 // Import ONLY sequelize from the new index file
 import { sequelize } from './models/index.js';
 
@@ -22,10 +21,9 @@ import auditLogRoutes from './routes/auditLog.routes.js';
 // --- 1b. DEFINE MODEL ASSOCIATIONS ---
 // THIS SECTION IS NOW REMOVED (it lives in src/models/index.js)
 
-// --- 3. Load Environment Variables ---
-// Note: dotenv.config() is called in server.js before importing this file
-// to ensure proper path resolution. If app.js is imported directly elsewhere,
-// make sure to call dotenv.config() first.
+// --- 3. Environment variables ---
+// Loaded via import './loadEnv.js' in server.js before this module. If you import
+// app.js from another entrypoint, import ./loadEnv.js (or dotenv.config) first.
 
 // --- 4. Initialize Express App ---
 const app = express();

@@ -8,6 +8,7 @@
 //
 // To this:
 import { sequelize, PurchaseOrder, PurchaseOrderItem, Vendor, User, Item } from '../models/index.js';
+import { recordAudit } from '../utils/auditLog.util.js';
 
 
 // --- 1. Create a new Purchase Order (Admin & Staff) ---
@@ -61,6 +62,19 @@ export const createPurchaseOrder = async (req, res) => {
 
     // --- Step 4: If all good, commit the transaction ---
     await t.commit();
+
+    await recordAudit({
+      userId: user_id,
+      action_type: 'CREATE',
+      module: 'PurchaseOrder',
+      record_id: po_id,
+      details: {
+        purchase_no,
+        vendor_id: parseInt(vendor_id, 10),
+        order_date,
+        item_count: items.length,
+      },
+    });
 
     // --- Step 5: (FIXED) Fetch response *after* committing ---
     // This will now work because the models know their associations
