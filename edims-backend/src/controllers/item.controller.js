@@ -1,5 +1,28 @@
-import { Item } from '../models/index.js';
+import { Item, PurchaseOrderItem, ChallanItem, BillItem, StockIssue } from '../models/index.js';
+import { Sequelize } from 'sequelize';
 import { actorUserId, recordAudit } from '../utils/auditLog.util.js';
+
+async function findItemByNameCaseInsensitive(name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return null;
+  return Item.findOne({
+    where: Sequelize.where(
+      Sequelize.fn('LOWER', Sequelize.col('item_name')),
+      trimmed.toLowerCase()
+    ),
+  });
+}
+
+async function itemHasTransactions(itemId) {
+  const id = parseInt(itemId, 10);
+  const [poCount, chCount, biCount, siCount] = await Promise.all([
+    PurchaseOrderItem.count({ where: { item_id: id } }),
+    ChallanItem.count({ where: { item_id: id } }),
+    BillItem.count({ where: { item_id: id } }),
+    StockIssue.count({ where: { item_id: id } }),
+  ]);
+  return { poCount, chCount, biCount, siCount, total: poCount + chCount + biCount + siCount };
+}
 
 // --- 1. Create a new Item (Admin Only) ---
 export const createItem = async (req, res) => {
@@ -12,6 +35,14 @@ export const createItem = async (req, res) => {
 
     if (!item_name || !item_name.trim()) {
       return res.status(400).json({ message: 'Item name is required' });
+    }
+
+    const duplicate = await findItemByNameCaseInsensitive(item_name);
+    if (duplicate) {
+      return res.status(400).json({
+        message:
+          'Duplicate item name is not allowed. An item with this name already exists.',
+      });
     }
 
     const newItem = await Item.create({
@@ -112,6 +143,17 @@ export const updateItem = async (req, res) => {
       return res.status(404).json({ message: 'Item not found' });
     }
 
+    const nextName = (item_name ?? item.item_name).trim();
+    if (nextName) {
+      const duplicate = await findItemByNameCaseInsensitive(nextName);
+      if (duplicate && duplicate.item_id !== parseInt(id, 10)) {
+        return res.status(400).json({
+          message:
+            'Duplicate item name is not allowed. Another item already uses this name.',
+        });
+      }
+    }
+
     item.item_name = item_name || item.item_name;
     item.size = size || item.size;
     item.color = color || item.color;
@@ -150,11 +192,17 @@ export const deleteItem = async (req, res) => {
       return res.status(404).json({ message: 'Item not found' });
     }
 
-    // TODO: Add check - don't allow delete if item is in stock
-    // or linked to a PO. We'll add this later.
     if (item.current_stock > 0) {
       return res.status(400)
-        .json({ message: 'Cannot delete item with stock > 0' });
+        .json({ message: 'Cannot delete item with stock greater than zero.' });
+    }
+
+    const tx = await itemHasTransactions(id);
+    if (tx.total > 0) {
+      return res.status(400).json({
+        message:
+          'Cannot delete this item. Transactions exist for this item (purchase orders, challans, bills, or stock issues). Remove or reassign those records first.',
+      });
     }
 
     await recordAudit({

@@ -1,4 +1,4 @@
-import { Vendor } from '../models/index.js'; // Import from index
+import { Vendor, PurchaseOrder, Bill } from '../models/index.js'; // Import from index
 import { actorUserId, recordAudit } from '../utils/auditLog.util.js';
 
 // --- 1. Create a new Vendor (Admin Only) ---
@@ -131,8 +131,16 @@ export const getVendorById = async (req, res) => {
 // --- 4. Update a Vendor (Admin Only) ---
 export const updateVendor = async (req, res) => {
   const { id } = req.params;
-  // Add gst_no to the destructuring
-  const { vendor_name, gst_no, contact_person, phone, email, address } = req.body;
+  const {
+    vendor_name,
+    gst_no,
+    gst_number,
+    contact_person,
+    phone,
+    phone_number,
+    email,
+    address,
+  } = req.body;
 
   try {
     const vendor = await Vendor.findByPk(id);
@@ -140,13 +148,27 @@ export const updateVendor = async (req, res) => {
       return res.status(404).json({ message: 'Vendor not found' });
     }
 
-    // Update fields
-    vendor.vendor_name = vendor_name || vendor.vendor_name;
-    vendor.gst_no = gst_no || vendor.gst_no; 
-    vendor.contact_person = contact_person || vendor.contact_person;
-    vendor.phone = phone || vendor.phone;
-    vendor.email = email || vendor.email;
-    vendor.address = address || vendor.address;
+    const finalGst = (gst_no || gst_number)?.trim();
+    const finalPhone = (phone || phone_number)?.trim();
+
+    if (vendor_name != null && vendor_name !== '') {
+      vendor.vendor_name = vendor_name.trim();
+    }
+    if (finalGst) {
+      vendor.gst_no = finalGst;
+    }
+    if (contact_person !== undefined) {
+      vendor.contact_person = contact_person?.trim() || null;
+    }
+    if (finalPhone !== undefined && finalPhone !== null) {
+      vendor.phone = finalPhone || null;
+    }
+    if (email !== undefined) {
+      vendor.email = email?.trim() || null;
+    }
+    if (address !== undefined) {
+      vendor.address = address?.trim() || null;
+    }
 
     await vendor.save();
 
@@ -185,9 +207,14 @@ export const deleteVendor = async (req, res) => {
       return res.status(404).json({ message: 'Vendor not found' });
     }
 
-    // We need to add a check here - don't allow delete if vendor is linked to a PO or Bill
-    // We will add this logic later.
-    // For now, we will just delete.
+    const poCount = await PurchaseOrder.count({ where: { vendor_id: vendor.vendor_id } });
+    const billCount = await Bill.count({ where: { vendor_id: vendor.vendor_id } });
+    if (poCount > 0 || billCount > 0) {
+      return res.status(400).json({
+        message:
+          'Cannot delete this vendor. Purchase order(s) or bill(s) already exist for this vendor.',
+      });
+    }
 
     await recordAudit({
       userId: actorUserId(req),

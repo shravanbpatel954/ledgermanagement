@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from "react";
 import api from "../utils/axiosConfig";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Edit, Trash2 } from "lucide-react";
 
 export default function ItemMaster() {
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState("");
   const [filterColumn, setFilterColumn] = useState("All Columns");
 
-  // Modal state for Add/Edit Item
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItemId, setEditingItemId] = useState(null);
   const [newItem, setNewItem] = useState({
     item_number: "",
     item_name: "",
@@ -16,17 +16,13 @@ export default function ItemMaster() {
     color: "",
   });
 
-  // Fetch items from the backend
   const fetchItems = async () => {
     try {
-      const res = await api.get('/api/items');
+      const res = await api.get("/api/items");
       setItems(res.data || []);
     } catch (err) {
       console.error("Error fetching items:", err.response || err.message);
-      if (err.response?.status === 404 || err.code === 'ECONNREFUSED') {
-        console.error("Backend server might not be running. Make sure it's started on port 5000.");
-      }
-      setItems([]); // Set empty array on error
+      setItems([]);
     }
   };
 
@@ -34,12 +30,13 @@ export default function ItemMaster() {
     fetchItems();
   }, []);
 
-  // When modal opens, auto-set next item_number
   const openAddModal = () => {
+    setEditingItemId(null);
     let nextNumber = 1;
     if (items.length > 0) {
-      // Get highest item_number
-      const maxItemNumber = Math.max(...items.map((i) => parseInt(i.item_number || 0)));
+      const maxItemNumber = Math.max(
+        ...items.map((i) => parseInt(i.item_number || i.item_id || 0, 10))
+      );
       nextNumber = maxItemNumber + 1;
     }
     setNewItem({
@@ -51,11 +48,29 @@ export default function ItemMaster() {
     setIsModalOpen(true);
   };
 
-  // Handle adding a new item
-  const handleAddItem = async (e) => {
+  const openEditModal = (item) => {
+    setEditingItemId(item.item_id);
+    setNewItem({
+      item_number: String(item.item_number || item.item_id),
+      item_name: item.item_name || "",
+      size: item.size || "",
+      color: item.color || "",
+    });
+    setIsModalOpen(true);
+  };
+
+  const duplicateNameLocally = (name, excludeId) => {
+    const n = name.trim().toLowerCase();
+    if (!n) return false;
+    return items.some((it) => {
+      if (excludeId != null && String(it.item_id) === String(excludeId)) return false;
+      return (it.item_name || "").trim().toLowerCase() === n;
+    });
+  };
+
+  const handleSaveItem = async (e) => {
     e.preventDefault();
 
-    // Basic validation
     if (!newItem.item_name.trim()) return alert("Item name is required.");
     if (!/^[a-zA-Z0-9\s]+$/.test(newItem.item_name))
       return alert("Item name can only contain letters, numbers, and spaces.");
@@ -64,64 +79,78 @@ export default function ItemMaster() {
     if (newItem.color && !/^[a-zA-Z\s]+$/.test(newItem.color))
       return alert("Color should contain only letters.");
 
-    try {
-      // Prepare data - remove item_number since it's auto-increment
-      const itemToSave = {
-        item_name: newItem.item_name.trim(),
-        size: newItem.size?.trim() || null,
-        color: newItem.color?.trim() || null,
-      };
+    if (duplicateNameLocally(newItem.item_name, editingItemId)) {
+      return alert(
+        "Duplicate item name is not allowed. An item with this name already exists."
+      );
+    }
 
-      // Create new item
-      const res = await api.post('/api/items', itemToSave);
-      console.log('Response:', res.data);
-      alert("Item added successfully!");
-      
-      // Refresh the list to get the latest data
+    const itemToSave = {
+      item_name: newItem.item_name.trim(),
+      size: newItem.size?.trim() || null,
+      color: newItem.color?.trim() || null,
+    };
+
+    try {
+      if (editingItemId) {
+        await api.put(`/api/items/${editingItemId}`, itemToSave);
+        alert("Item updated successfully!");
+      } else {
+        await api.post("/api/items", itemToSave);
+        alert("Item added successfully!");
+      }
+
       await fetchItems();
       resetForm();
       setIsModalOpen(false);
     } catch (err) {
-      console.error("Full error object:", err);
-      console.error("Error response:", err.response);
-      console.error("Error message:", err.message);
-      
-      let errorMsg = "Failed to add item.";
-      
-      if (err.response) {
-        // Server responded with error
-        errorMsg = err.response.data?.message || err.response.data?.error || `Server error: ${err.response.status}`;
-        console.error("Server error:", err.response.status, err.response.data);
-      } else if (err.request) {
-        // Request was made but no response received
-        errorMsg = "Cannot connect to backend server. Make sure it's running on port 5000.";
-        console.error("No response received:", err.request);
-      } else {
-        // Error in request setup
-        errorMsg = err.message || "Failed to add item.";
-        console.error("Request setup error:", err.message);
-      }
-      
+      const errorMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "Failed to save item.";
+      alert(errorMsg);
+    }
+  };
+
+  const handleDeleteItem = async (item) => {
+    if (
+      !window.confirm(
+        `Delete item "${item.item_name}"? This cannot be undone if allowed.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.delete(`/api/items/${item.item_id}`);
+      alert("Item deleted successfully!");
+      await fetchItems();
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to delete item.";
       alert(errorMsg);
     }
   };
 
   const resetForm = () => {
     setNewItem({ item_number: "", item_name: "", size: "", color: "" });
+    setEditingItemId(null);
   };
 
-  // Filter items based on search and selected column
   const filteredItems = items.filter((item) => {
     const searchText = search.toLowerCase();
     if (filterColumn === "All Columns") {
-      return Object.values(item).some((val) => val?.toString().toLowerCase().includes(searchText));
+      return Object.values(item).some((val) =>
+        val?.toString().toLowerCase().includes(searchText)
+      );
     }
     return item[filterColumn]?.toString().toLowerCase().includes(searchText);
   });
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
-      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-800">Item Master</h1>
         <button
@@ -132,11 +161,9 @@ export default function ItemMaster() {
         </button>
       </div>
 
-      {/* Table */}
       <div className="bg-white shadow rounded-xl p-6">
         <h2 className="text-lg font-semibold mb-4">Items List</h2>
 
-        {/* Search & Filter */}
         <div className="flex flex-wrap gap-4 mb-6">
           <input
             type="text"
@@ -158,7 +185,6 @@ export default function ItemMaster() {
           </select>
         </div>
 
-        {/* Table Data */}
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
@@ -167,15 +193,39 @@ export default function ItemMaster() {
                 <th className="p-3 border-b">Item Name</th>
                 <th className="p-3 border-b">Size</th>
                 <th className="p-3 border-b">Color</th>
+                <th className="p-3 border-b text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map((item, index) => (
-                <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
+              {filteredItems.map((item) => (
+                <tr
+                  key={item.item_id}
+                  className="hover:bg-gray-50 transition-colors duration-150"
+                >
                   <td className="p-3 border-b">{item.item_number}</td>
                   <td className="p-3 border-b">{item.item_name}</td>
-                  <td className="p-3 border-b">{item.size}</td>
-                  <td className="p-3 border-b">{item.color}</td>
+                  <td className="p-3 border-b">{item.size || "—"}</td>
+                  <td className="p-3 border-b">{item.color || "—"}</td>
+                  <td className="p-3 border-b">
+                    <div className="flex justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(item)}
+                        className="text-blue-600 hover:text-blue-800"
+                        title="Edit"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteItem(item)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Delete"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -186,25 +236,27 @@ export default function ItemMaster() {
         </div>
       </div>
 
-      {/* Add Item Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg relative">
             <button
-              onClick={() => setIsModalOpen(false)}
+              type="button"
+              onClick={() => {
+                setIsModalOpen(false);
+                resetForm();
+              }}
               className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
             >
               <X size={20} />
             </button>
 
             <h2 className="text-xl font-semibold mb-4 text-gray-800">
-              Add New Item
+              {editingItemId ? "Edit Item" : "Add New Item"}
             </h2>
 
-            <form onSubmit={handleAddItem} className="space-y-4">
-              {/* Item Number (Auto-generated) */}
+            <form onSubmit={handleSaveItem} className="space-y-4">
               <div>
-                <label className="block text-gray-700 mb-1">Item Number </label>
+                <label className="block text-gray-700 mb-1">Item Number</label>
                 <input
                   type="number"
                   value={newItem.item_number}
@@ -213,45 +265,53 @@ export default function ItemMaster() {
                 />
               </div>
 
-              {/* Item Name */}
               <div>
                 <label className="block text-gray-700 mb-1">Item Name</label>
                 <input
                   type="text"
                   value={newItem.item_name}
-                  onChange={(e) => setNewItem({ ...newItem, item_name: e.target.value })}
+                  onChange={(e) =>
+                    setNewItem({ ...newItem, item_name: e.target.value })
+                  }
                   required
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Item names must be unique (case-insensitive).
+                </p>
               </div>
 
-              {/* Size */}
               <div>
                 <label className="block text-gray-700 mb-1">Size</label>
                 <input
                   type="text"
                   value={newItem.size}
-                  onChange={(e) => setNewItem({ ...newItem, size: e.target.value })}
+                  onChange={(e) =>
+                    setNewItem({ ...newItem, size: e.target.value })
+                  }
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
 
-              {/* Color */}
               <div>
                 <label className="block text-gray-700 mb-1">Color</label>
                 <input
                   type="text"
                   value={newItem.color}
-                  onChange={(e) => setNewItem({ ...newItem, color: e.target.value })}
+                  onChange={(e) =>
+                    setNewItem({ ...newItem, color: e.target.value })
+                  }
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
 
-              {/* Form Buttons */}
               <div className="flex justify-end gap-3 mt-4">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    resetForm();
+                  }}
                   className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100"
                 >
                   Cancel
@@ -260,7 +320,7 @@ export default function ItemMaster() {
                   type="submit"
                   className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium"
                 >
-                  Save
+                  {editingItemId ? "Update" : "Save"}
                 </button>
               </div>
             </form>

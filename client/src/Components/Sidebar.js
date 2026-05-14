@@ -122,17 +122,17 @@ const Sidebar = ({ setPage, collapsed, setCollapsed }) => {
           {!collapsed && openEntry && (
             <ul className="ml-6 mt-1 space-y-1 text-sm">
               {[
-                "Purchase Entry",
-                "Challan Entry",
-                "Bill Entry",
-                "Issue Entry",
+                { label: "Purchase Order", key: "Purchase Entry" },
+                { label: "Challan", key: "Challan Entry" },
+                { label: "Invoice", key: "Bill Entry" },
+                { label: "Issue", key: "Issue Entry" },
               ].map((item) => (
                 <li
-                  key={item}
-                  onClick={() => setPage(item)}
+                  key={item.key}
+                  onClick={() => setPage(item.key)}
                   className="cursor-pointer hover:bg-blue-700 p-2 rounded transition"
                 >
-                  {item}
+                  {item.label}
                 </li>
               ))}
             </ul>

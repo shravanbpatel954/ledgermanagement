@@ -1,4 +1,4 @@
-import { Department } from '../models/index.js';
+import { Department, StockIssue } from '../models/index.js';
 import { actorUserId, recordAudit } from '../utils/auditLog.util.js';
 
 // --- 1. Create a new Department (Admin Only) ---
@@ -106,10 +106,15 @@ export const deleteDepartment = async (req, res) => {
     if (!department) {
       return res.status(404).json({ message: 'Department not found' });
     }
-    
-    // TODO: Add check - don't delete if linked to a StockIssue
-    // We'll add this later.
-    
+
+    const issueCount = await StockIssue.count({ where: { dept_id: department.dept_id } });
+    if (issueCount > 0) {
+      return res.status(400).json({
+        message:
+          'Cannot delete this department. Stock issue transaction(s) exist for this department.',
+      });
+    }
+
     await recordAudit({
       userId: actorUserId(req),
       action_type: 'DELETE',
