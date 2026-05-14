@@ -1,5 +1,9 @@
-import { Vendor, PurchaseOrder, Bill } from '../models/index.js'; // Import from index
+import { Vendor } from '../models/index.js'; // Import from index
 import { actorUserId, recordAudit } from '../utils/auditLog.util.js';
+import {
+  getVendorTransactionTotal,
+  MSG_VENDOR_MASTER_TX,
+} from '../utils/mastersTransactionGuard.js';
 
 // --- 1. Create a new Vendor (Admin Only) ---
 export const createVendor = async (req, res) => {
@@ -148,6 +152,11 @@ export const updateVendor = async (req, res) => {
       return res.status(404).json({ message: 'Vendor not found' });
     }
 
+    const vTx = await getVendorTransactionTotal(vendor.vendor_id);
+    if (vTx > 0) {
+      return res.status(400).json({ message: MSG_VENDOR_MASTER_TX });
+    }
+
     const finalGst = (gst_no || gst_number)?.trim();
     const finalPhone = (phone || phone_number)?.trim();
 
@@ -207,13 +216,9 @@ export const deleteVendor = async (req, res) => {
       return res.status(404).json({ message: 'Vendor not found' });
     }
 
-    const poCount = await PurchaseOrder.count({ where: { vendor_id: vendor.vendor_id } });
-    const billCount = await Bill.count({ where: { vendor_id: vendor.vendor_id } });
-    if (poCount > 0 || billCount > 0) {
-      return res.status(400).json({
-        message:
-          'Cannot delete this vendor. Purchase order(s) or bill(s) already exist for this vendor.',
-      });
+    const vTx = await getVendorTransactionTotal(vendor.vendor_id);
+    if (vTx > 0) {
+      return res.status(400).json({ message: MSG_VENDOR_MASTER_TX });
     }
 
     await recordAudit({
@@ -232,7 +237,7 @@ export const deleteVendor = async (req, res) => {
   } catch (error) {
     // Handle foreign key constraint error
     if (error.name === 'SequelizeForeignKeyConstraintError') {
-      return res.status(400).json({ message: 'Cannot delete vendor. It is already linked to a Purchase Order or Bill.' });
+      return res.status(400).json({ message: MSG_VENDOR_MASTER_TX });
     }
     res.status(500).json({ message: 'Server error', error: error.message });
   }

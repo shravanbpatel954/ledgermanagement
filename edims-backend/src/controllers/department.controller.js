@@ -1,5 +1,9 @@
-import { Department, StockIssue } from '../models/index.js';
+import { Department } from '../models/index.js';
 import { actorUserId, recordAudit } from '../utils/auditLog.util.js';
+import {
+  getDepartmentIssueTotal,
+  MSG_DEPT_MASTER_TX,
+} from '../utils/mastersTransactionGuard.js';
 
 // --- 1. Create a new Department (Admin Only) ---
 export const createDepartment = async (req, res) => {
@@ -77,6 +81,11 @@ export const updateDepartment = async (req, res) => {
       return res.status(404).json({ message: 'Department not found' });
     }
 
+    const dTx = await getDepartmentIssueTotal(department.dept_id);
+    if (dTx > 0) {
+      return res.status(400).json({ message: MSG_DEPT_MASTER_TX });
+    }
+
     department.dept_name = dept_name || department.dept_name;
     await department.save();
 
@@ -107,12 +116,9 @@ export const deleteDepartment = async (req, res) => {
       return res.status(404).json({ message: 'Department not found' });
     }
 
-    const issueCount = await StockIssue.count({ where: { dept_id: department.dept_id } });
-    if (issueCount > 0) {
-      return res.status(400).json({
-        message:
-          'Cannot delete this department. Stock issue transaction(s) exist for this department.',
-      });
+    const dTx = await getDepartmentIssueTotal(department.dept_id);
+    if (dTx > 0) {
+      return res.status(400).json({ message: MSG_DEPT_MASTER_TX });
     }
 
     await recordAudit({

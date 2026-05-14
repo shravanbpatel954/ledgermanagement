@@ -1,6 +1,10 @@
-import { Item, PurchaseOrderItem, ChallanItem, BillItem, StockIssue } from '../models/index.js';
+import { Item } from '../models/index.js';
 import { Sequelize } from 'sequelize';
 import { actorUserId, recordAudit } from '../utils/auditLog.util.js';
+import {
+  getItemTransactionTotal,
+  MSG_ITEM_MASTER_TX,
+} from '../utils/mastersTransactionGuard.js';
 
 async function findItemByNameCaseInsensitive(name) {
   const trimmed = (name || '').trim();
@@ -11,17 +15,6 @@ async function findItemByNameCaseInsensitive(name) {
       trimmed.toLowerCase()
     ),
   });
-}
-
-async function itemHasTransactions(itemId) {
-  const id = parseInt(itemId, 10);
-  const [poCount, chCount, biCount, siCount] = await Promise.all([
-    PurchaseOrderItem.count({ where: { item_id: id } }),
-    ChallanItem.count({ where: { item_id: id } }),
-    BillItem.count({ where: { item_id: id } }),
-    StockIssue.count({ where: { item_id: id } }),
-  ]);
-  return { poCount, chCount, biCount, siCount, total: poCount + chCount + biCount + siCount };
 }
 
 // --- 1. Create a new Item (Admin Only) ---
@@ -143,6 +136,11 @@ export const updateItem = async (req, res) => {
       return res.status(404).json({ message: 'Item not found' });
     }
 
+    const txTotal = await getItemTransactionTotal(id);
+    if (txTotal > 0) {
+      return res.status(400).json({ message: MSG_ITEM_MASTER_TX });
+    }
+
     const nextName = (item_name ?? item.item_name).trim();
     if (nextName) {
       const duplicate = await findItemByNameCaseInsensitive(nextName);
@@ -193,16 +191,15 @@ export const deleteItem = async (req, res) => {
     }
 
     if (item.current_stock > 0) {
-      return res.status(400)
-        .json({ message: 'Cannot delete item with stock greater than zero.' });
-    }
-
-    const tx = await itemHasTransactions(id);
-    if (tx.total > 0) {
       return res.status(400).json({
         message:
-          'Cannot delete this item. Transactions exist for this item (purchase orders, challans, bills, or stock issues). Remove or reassign those records first.',
+          'This item has stock on hand. Deletion is not allowed while quantity remains.',
       });
+    }
+
+    const txTotal = await getItemTransactionTotal(id);
+    if (txTotal > 0) {
+      return res.status(400).json({ message: MSG_ITEM_MASTER_TX });
     }
 
     await recordAudit({
