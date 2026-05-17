@@ -1,17 +1,16 @@
 import { useState } from "react";
+import { APP_TAGLINE, SHELL } from "../utils/branding";
 import {
   Squares2X2Icon,
   CubeIcon,
-  ClipboardDocumentIcon,
-  ChartBarIcon,
+  BookOpenIcon,
+  ArrowsRightLeftIcon,
   ChevronDownIcon,
   Bars3Icon,
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 
 const Sidebar = ({ setPage, collapsed, setCollapsed }) => {
-  const [openEntry, setOpenEntry] = useState(false);
-  const [openReports, setOpenReports] = useState(false);
   const [openMasters, setOpenMasters] = useState(false);
 
   const userRole = sessionStorage.getItem("role") || "Staff";
@@ -19,65 +18,84 @@ const Sidebar = ({ setPage, collapsed, setCollapsed }) => {
 
   return (
     <div
-      className={`bg-[#062b52] text-white ${
+      className={`${SHELL.sidebar} ${
         collapsed ? "w-20" : "w-64"
-      } h-screen p-4 flex flex-col transition-all duration-300 flex-shrink-0 overflow-y-auto`}
+      } h-screen p-4 flex flex-col transition-all duration-300 flex-shrink-0 overflow-y-auto border-r border-slate-800`}
     >
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         {!collapsed && (
           <div>
-            <h1 className="text-lg font-bold leading-none">Inventory</h1>
-            <p className="text-[10px] text-gray-300">Paper Sales</p>
+            <h1 className="text-lg font-bold leading-none text-amber-400">Ledger Management</h1>
+            <p className="text-[10px] text-slate-400 mt-0.5">{APP_TAGLINE}</p>
           </div>
         )}
         <button
+          type="button"
           onClick={() => setCollapsed(!collapsed)}
           className="text-gray-300 hover:text-white"
         >
           <Bars3Icon className="h-6 w-6" />
         </button>
       </div>
-      <ul className="space-y-3 text-sm">
-        {/* Dashboard */}
+
+      <ul className="space-y-2 text-sm">
         <li
-          className="flex items-center gap-2 hover:bg-blue-900 p-2 rounded cursor-pointer transition"
+          className={`flex items-center gap-2 ${SHELL.sidebarHover} p-2 rounded cursor-pointer`}
           onClick={() => setPage("Dashboard")}
         >
-          <Squares2X2Icon className="h-5 w-5" />
+          <Squares2X2Icon className="h-5 w-5 shrink-0" />
           {!collapsed && <span>Dashboard</span>}
         </li>
-        {/* Masters Dropdown (Admin Only) */}
+
+        <li
+          className="flex items-center gap-2 hover:bg-indigo-900/80 p-2 rounded cursor-pointer"
+          onClick={() => setPage("LedgerMaster")}
+        >
+          <BookOpenIcon className="h-5 w-5 shrink-0" />
+          {!collapsed && <span>Ledger Master</span>}
+        </li>
+
+        <li
+          className="flex items-center gap-2 hover:bg-indigo-900/80 p-2 rounded cursor-pointer"
+          onClick={() => setPage("IssueLedger")}
+        >
+          <ArrowsRightLeftIcon className="h-5 w-5 shrink-0" />
+          {!collapsed && <span>Issue Ledger</span>}
+        </li>
+
+        <li
+          className="flex items-center gap-2 hover:bg-indigo-900/80 p-2 rounded cursor-pointer"
+          onClick={() => setPage("ReturnLedger")}
+        >
+          <ArrowsRightLeftIcon className="h-5 w-5 shrink-0" />
+          {!collapsed && <span>Return Ledger</span>}
+        </li>
+
         {isAdmin && (
           <li>
             <button
-              onClick={() => !collapsed && setOpenMasters(!openMasters)} // ✅ prevent open in collapsed
-              className="flex items-center gap-2 hover:bg-blue-900 p-2 rounded cursor-pointer w-full transition"
+              type="button"
+              onClick={() => !collapsed && setOpenMasters(!openMasters)}
+              className="flex items-center gap-2 hover:bg-indigo-900/80 p-2 rounded w-full"
             >
-              <CubeIcon className="h-5 w-5" />
-              {!collapsed && <span>Masters</span>}
+              <CubeIcon className="h-5 w-5 shrink-0" />
+              {!collapsed && <span className="flex-1 text-left">Masters</span>}
               {!collapsed && (
                 <ChevronDownIcon
-                  className={`h-4 w-4 transform transition ${
-                    openMasters ? "rotate-180" : ""
-                  }`}
+                  className={`h-4 w-4 ${openMasters ? "rotate-180" : ""}`}
                 />
               )}
             </button>
-
-            {/* Masters dropdown menu */}
             {!collapsed && openMasters && (
-              <ul className="ml-6 mt-1 space-y-1 text-sm">
+              <ul className="ml-6 mt-1 space-y-1">
                 {[
-                  { label: "Item Master", key: "ItemMaster" },
-                  { label: "Vendor Master", key: "VendorMaster" },
                   { label: "Department Master", key: "DepartmentMaster" },
                   { label: "User Management", key: "UserManagement" },
                 ].map((item) => (
                   <li
                     key={item.key}
                     onClick={() => setPage(item.key)}
-                    className="cursor-pointer hover:bg-blue-700 p-2 rounded transition"
+                    className="cursor-pointer hover:bg-indigo-800/60 p-2 rounded"
                   >
                     {item.label}
                   </li>
@@ -87,100 +105,16 @@ const Sidebar = ({ setPage, collapsed, setCollapsed }) => {
           </li>
         )}
 
-        {/* Audit Log - Admin Only */}
         {isAdmin && (
           <li
-            className="flex items-center gap-2 hover:bg-blue-900 p-2 rounded cursor-pointer transition"
+            className="flex items-center gap-2 hover:bg-indigo-900/80 p-2 rounded cursor-pointer"
             onClick={() => setPage("Audit Log")}
           >
-            <DocumentTextIcon className="h-5 w-5" />
+            <DocumentTextIcon className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Audit Log</span>}
           </li>
         )}
 
-        {/* Entry */}
-        {!collapsed && (
-          <p className="text-gray-400 text-xs mt-3 uppercase">Entry</p>
-        )}
-        <li>
-          <button
-            onClick={() => !collapsed && setOpenEntry(!openEntry)}
-            className="flex w-full items-center justify-between hover:bg-blue-900 p-2 rounded transition"
-          >
-            <span className="flex items-center gap-2">
-              <ClipboardDocumentIcon className="h-5 w-5" />
-              {!collapsed && <span>Entry</span>}
-            </span>
-            {!collapsed && (
-              <ChevronDownIcon
-                className={`h-4 w-4 transform transition ${
-                  openEntry ? "rotate-180" : ""
-                }`}
-              />
-            )}
-          </button>
-          {!collapsed && openEntry && (
-            <ul className="ml-6 mt-1 space-y-1 text-sm">
-              {[
-                { label: "Purchase Order", key: "Purchase Entry" },
-                { label: "Challan", key: "Challan Entry" },
-                { label: "Invoice", key: "Bill Entry" },
-                { label: "Issue", key: "Issue Entry" },
-              ].map((item) => (
-                <li
-                  key={item.key}
-                  onClick={() => setPage(item.key)}
-                  className="cursor-pointer hover:bg-blue-700 p-2 rounded transition"
-                >
-                  {item.label}
-                </li>
-              ))}
-            </ul>
-          )}
-        </li>
-
-        {/* Reports - Accessible to all users */}
-        <>
-          {!collapsed && (
-            <p className="text-gray-400 text-xs mt-3 uppercase">Reports</p>
-          )}
-          <li>
-            <button
-              onClick={() => !collapsed && setOpenReports(!openReports)}
-              className="flex w-full items-center justify-between hover:bg-blue-900 p-2 rounded transition"
-            >
-              <span className="flex items-center gap-2">
-                <ChartBarIcon className="h-5 w-5" />
-                {!collapsed && <span>Reports</span>}
-              </span>
-              {!collapsed && (
-                <ChevronDownIcon
-                  className={`h-4 w-4 transform transition ${
-                    openReports ? "rotate-180" : ""
-                  }`}
-                />
-              )}
-            </button>
-            {!collapsed && openReports && (
-              <ul className="ml-6 mt-1 space-y-1 text-sm">
-                {[
-                  "Item Ledger",
-                  "Stock Ledger",
-                  "Vendor Ledger",
-                  "Bill Ledger",
-                ].map((item) => (
-                  <li
-                    key={item}
-                    onClick={() => setPage(item)}
-                    className="cursor-pointer hover:bg-blue-700 p-2 rounded transition"
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        </>
       </ul>
     </div>
   );

@@ -8,15 +8,10 @@ import { sequelize } from './models/index.js';
 
 // --- 2. Import Routes ---
 import authRoutes from './routes/auth.routes.js';
-import vendorRoutes from './routes/vendor.routes.js';
-import itemRoutes from './routes/item.routes.js';
 import departmentRoutes from './routes/department.routes.js';
-import purchaseOrderRoutes from './routes/purchaseOrder.routes.js';
-import challanRoutes from './routes/challan.routes.js';
-import billRoutes from './routes/bill.routes.js';
-import stockIssueRoutes from './routes/stockIssue.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import auditLogRoutes from './routes/auditLog.routes.js';
+import ledgerRoutes from './routes/ledger.routes.js';
 
 // --- 1b. DEFINE MODEL ASSOCIATIONS ---
 // THIS SECTION IS NOW REMOVED (it lives in src/models/index.js)
@@ -56,25 +51,17 @@ app.use((req, res, next) => {
 
 // --- 6. API Routes ---
 app.use('/api/auth', authRoutes);
-app.use('/api/vendors', vendorRoutes);
-app.use('/api/items', itemRoutes);
 app.use('/api/departments', departmentRoutes);
-app.use('/api/purchase-orders', purchaseOrderRoutes);
-app.use('/api/challans', challanRoutes);
-app.use('/api/bills', billRoutes);
-app.use('/api/stock-issues', stockIssueRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/ledgers', ledgerRoutes);
 
 // --- 7. Basic Test Route ---
 app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to the EDIMS backend API!' });
+  res.json({ message: 'Welcome to the Exam Ledger Management API (MU)' });
 });
 
-// Test route for items endpoint
-app.get('/api/test-items', (req, res) => {
-  res.json({ message: 'Items API endpoint is accessible', timestamp: new Date().toISOString() });
-});
+
 
 // Test route for auth endpoint
 app.post('/api/auth/test', (req, res) => {

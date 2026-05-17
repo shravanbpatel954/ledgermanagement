@@ -7,6 +7,7 @@ import {
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import api from "../utils/axiosConfig";
+import { APP_SHORT, SHELL } from "../utils/branding";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -71,10 +72,11 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-white shadow-md border-b border-gray-200 flex-shrink-0">
+    <nav className={`${SHELL.navbar} flex-shrink-0`}>
       <div className="px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <h1 className="text-xl font-bold text-gray-800">EDIMS</h1>
+        <div className="flex flex-col">
+          <h1 className={SHELL.navbarTitle}>{APP_SHORT}</h1>
+          <span className={SHELL.navbarAccent}>Exam Ledger Management</span>
         </div>
 
         {/* User Profile Section */}
@@ -108,8 +110,8 @@ export default function Navbar() {
                 <span
                   className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded-full ${
                     userRole === "Admin"
-                      ? "bg-purple-100 text-purple-800"
-                      : "bg-blue-100 text-blue-800"
+                      ? "bg-amber-100 text-amber-900"
+                      : "bg-indigo-100 text-indigo-900"
                   }`}
                 >
                   {userRole}
